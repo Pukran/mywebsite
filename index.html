@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>บอร์ดเกมวิทยาศาสตร์</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@400;700&display=swap');
+  body {
+    margin: 0; font-family: 'Kanit', sans-serif;
+    background: linear-gradient(135deg, #004466, #006699);
+    color: #fff;
+    display: flex; flex-direction: column; align-items: center;
+    min-height: 100vh;
+    user-select: none;
+  }
+  h1 {
+    font-size: 3rem; margin: 25px 0;
+    text-shadow: 0 0 15px #00ffff;
+  }
+  #scoreboard {
+    display: flex; gap: 40px; margin-bottom: 30px;
+  }
+  .team {
+    padding: 14px 28px;
+    border-radius: 18px;
+    background: #004d80;
+    box-shadow: 0 0 14px #00ffff;
+    font-size: 1.5rem;
+    font-weight: 700;
+  }
+  .team.active {
+    background: #00ffff;
+    color: #004d80;
+  }
+  #card-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 30px;
+    width: 90vw;
+    max-width: 1040px;
+  }
+  .card {
+    width: 320px; height: 380px;
+    perspective: 1000px;
+    cursor: pointer;
+    border-radius: 20px;
+  }
+  .card-inner {
+    position: relative;
+    width: 100%; height: 100%;
+    border-radius: 20px;
+    transition: transform 0.6s ease;
+    transform-style: preserve-3d;
+    box-shadow: 0 0 20px #00ffff;
+    background-color: #00bfff;
+  }
+  .card.open .card-inner {
+    transform: rotateY(180deg);
+  }
+  .card-front, .card-back {
+    position: absolute;
+    width: 100%; height: 100%;
+    border-radius: 20px;
+    backface-visibility: hidden;
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+    box-sizing: border-box;
+    user-select: none;
+    text-align: center;
+    line-height: 1.4;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  }
+  .card-front {
+    font-weight: 900;
+    color: #00ffff;
+    background: #00334d;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 100px;
+    transition: none;
+  }
+  /* ใส่ไอคอนอะตอม SVG เป็น background */
+  .card-front::before {
+    content: "";
+    display: block;
+    width: 110px;
+    height: 110px;
+    background-image: url('data:image/svg+xml;utf8,<svg fill="%2300ffff" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="6"/><ellipse cx="32" cy="32" rx="26" ry="10" fill="none" stroke="%2300ffff" stroke-width="3"/><ellipse cx="32" cy="32" rx="26" ry="10" transform="rotate(60 32 32)" fill="none" stroke="%2300ffff" stroke-width="3"/><ellipse cx="32" cy="32" rx="26" ry="10" transform="rotate(120 32 32)" fill="none" stroke="%2300ffff" stroke-width="3"/></svg>');
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+    transform: none !important;
+  }
+  .card-back {
+    background: #00334d;
+    color: #cceeff;
+    font-weight: 600;
+    transform: rotateY(180deg);
+    flex-direction: column;
+    justify-content: space-between;
+    display: flex;
+  }
+  .question-text {
+    font-size: 2rem;
+    line-height: 1.4;
+    overflow-y: auto;
+    max-height: 150px;
+    margin-bottom: 22px;
+    font-weight: 700;
+  }
+  .options {
+    display: flex; flex-direction: column; gap: 20px;
+    max-height: 160px; overflow-y: auto;
+  }
+  .options button {
+    background: #00ffff;
+    border: none;
+    border-radius: 16px;
+    padding: 14px;
+    font-size: 2.8rem;
+    font-weight: 700;
+    color: #004d80;
+    cursor: pointer;
+    box-shadow: 0 0 10px #00cccc;
+    transition: background-color 0.3s;
+    text-shadow: 0 1px 1px rgba(255,255,255,0.8);
+    line-height: 1.3;
+  }
+  .options button:hover:not(:disabled) {
+    background-color: #0099cc;
+    color: #fff;
+  }
+  .options button:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  #message {
+    margin: 30px 0 50px 0;
+    font-size: 2rem;
+    min-height: 60px;
+    text-align: center;
+    color: #00ffff;
+    text-shadow: 0 0 15px #00e5ff;
+    font-weight: 700;
+  }
+  @media (max-width: 960px) {
+    .card {
+      width: 90vw;
+      height: 350px;
+    }
+  }
+</style>
+</head>
+<body>
+
+<h1>บอร์ดเกมวิทยาศาสตร์</h1>
+<div id="scoreboard"></div>
+<div id="card-grid"></div>
+<div id="message">ถึงคิวทีม 1 เริ่มเกมโดยคลิกไพ่เพื่อเลือกคำถาม</div>
+
+<script>
+  const numPlayers = 2;
+  let scores = [0, 0];
+  let currentTeam = 0;
+
+  const NUM_CARDS = 6;
+
+  // คำถาม 60 ข้อ ง่าย ๆ สำหรับ ม.1-ม.2
+  const allQuestions = [
+    { q: "น้ำแข็งละลายกลายเป็นอะไร?", options: ["น้ำ", "น้ำตาล", "น้ำมัน", "น้ำส้ม"], answer: 0 },
+    { q: "พืชใช้ส่วนไหนดูดน้ำ?", options: ["ราก", "ใบ", "ลำต้น", "ดอก"], answer: 0 },
+    { q: "สัตว์ที่บินได้คือ?", options: ["ปลา", "นก", "ช้าง", "แมว"], answer: 1 },
+    { q: "พลังงานที่ได้จากแสงแดดคือ?", options: ["ไฟฟ้า", "ความร้อน", "พลังงานแสง", "เสียง"], answer: 2 },
+    { q: "ร่างกายมนุษย์ใช้ส่วนไหนในการหายใจ?", options: ["หัวใจ", "ตับ", "ปอด", "ไต"], answer: 2 },
+    { q: "น้ำมีสถานะอะไร?", options: ["ของแข็ง", "ของเหลว", "แก๊ส", "พลาสมา"], answer: 1 },
+    { q: "แรงโน้มถ่วงทำให้สิ่งของตกลงสู่?", options: ["พื้น", "ลม", "น้ำ", "อากาศ"], answer: 0 },
+    { q: "สีของท้องฟ้าเกิดจากอะไร?", options: ["การกระเจิงของแสง", "น้ำ", "ฝุ่น", "ควัน"], answer: 0 },
+    { q: "พืชสร้างอาหารโดยใช้สารอะไร?", options: ["น้ำ", "แสงแดด", "ลม", "ดิน"], answer: 1 },
+    { q: "สัตว์เลี้ยงลูกด้วยนมมีขนหรือขนไหม?", options: ["ขน", "เกล็ด", "หนัง", "ขนนก"], answer: 0 },
+    { q: "พลังงานไฟฟ้าผลิตจากอะไรได้บ้าง?", options: ["น้ำ", "ลม", "ถ่านหิน", "ทุกข้อ"], answer: 3 },
+    { q: "อะตอมคืออะไร?", options: ["หน่วยเล็กที่สุดของสาร", "ดาว", "โมเลกุล", "เซลล์"], answer: 0 },
+    { q: "น้ำตาลมีสถานะอะไร?", options: ["ของแข็ง", "ของเหลว", "แก๊ส", "พลาสมา"], answer: 0 },
+    { q: "อุณหภูมิของน้ำเดือดที่อุณหภูมิเท่าไร?", options: ["0°C", "50°C", "100°C", "200°C"], answer: 2 },
+    { q: "สัตว์เลื้อยคลานคือสัตว์อะไร?", options: ["นก", "ปลา", "งู", "แมลง"], answer: 2 },
+    { q: "ใยแมงมุมทำมาจากอะไร?", options: ["น้ำตาล", "โปรตีน", "แร่ธาตุ", "เซลล์"], answer: 1 },
+    { q: "พลังงานที่ไม่สามารถสร้างขึ้นใหม่ได้เรียกว่าอะไร?", options: ["พลังงานหมุนเวียน", "พลังงานทดแทน", "พลังงานฟอสซิล", "พลังงานแสง"], answer: 2 },
+    { q: "เซลล์คืออะไร?", options: ["หน่วยพื้นฐานของสิ่งมีชีวิต", "อวัยวะ", "เนื้อเยื่อ", "โมเลกุล"], answer: 0 },
+    { q: "ดินประเภทไหนเหมาะกับการปลูกพืช?", options: ["ดินร่วน", "ดินทราย", "ดินเหนียว", "ดินเค็ม"], answer: 0 },
+    { q: "อวัยวะใดในร่างกายช่วยย่อยอาหาร?", options: ["หัวใจ", "ตับ", "กระเพาะอาหาร", "ปอด"], answer: 2 },
+    { q: "สิ่งมีชีวิตที่สร้างอาหารเองได้เรียกว่าอะไร?", options: ["ผู้บริโภค", "ผู้ผลิต", "ผู้ย่อยสลาย", "ผู้ล่า"], answer: 1 },
+    { q: "แสงเดินทางด้วยอะไร?", options: ["เสียง", "คลื่นแม่เหล็กไฟฟ้า", "น้ำ", "อากาศ"], answer: 1 },
+    { q: "ของแข็งละลายกลายเป็นของเหลวเมื่อมีการ?", options: ["ระเหย", "เย็นลง", "ให้ความร้อน", "แช่แข็ง"], answer: 2 },
+    { q: "ไฟฟ้าไหลผ่านวัสดุชนิดใดได้ดี?", options: ["ฉนวน", "ตัวนำ", "พลาสติก", "ยาง"], answer: 1 },
+    { q: "สิ่งใดเป็นพลังงานหมุนเวียน?", options: ["ถ่านหิน", "น้ำ", "น้ำมัน", "แก๊สธรรมชาติ"], answer: 1 },
+    { q: "สัตว์ชนิดใดเป็นสัตว์เลือดอุ่น?", options: ["งู", "นก", "ปลา", "จิ้งจก"], answer: 1 },
+    { q: "น้ำหนักของสิ่งของขึ้นอยู่กับ?", options: ["มวล", "แรงโน้มถ่วง", "ปริมาตร", "ความหนาแน่น"], answer: 1 },
+    { q: "การกลั่นน้ำเพื่อให้สะอาดใช้วิธีใด?", options: ["กรอง", "ระเหยและควบแน่น", "ต้ม", "ผสมสารเคมี"], answer: 1 },
+    { q: "พืชใช้แสงเพื่ออะไร?", options: ["สร้างอาหาร", "หายใจ", "เคลื่อนที่", "เติบโต"], answer: 0 },
+    { q: "โลหะชนิดใดนำไฟฟ้าได้ดีที่สุด?", options: ["ทองแดง", "ทอง", "เหล็ก", "อลูมิเนียม"], answer: 1 },
+    { q: "กระบวนการใดที่ทำให้พืชสูญเสียน้ำ?", options: ["การระเหย", "การคายน้ำ", "การดูดซึม", "การสังเคราะห์แสง"], answer: 1 },
+    { q: "อวัยวะในพืชที่ทำหน้าที่สังเคราะห์แสงคือ?", options: ["ใบ", "ราก", "ลำต้น", "ดอก"], answer: 0 },
+    { q: "การเปลี่ยนสถานะจากของเหลวเป็นแก๊สเรียกว่า?", options: ["ระเหย", "หลอมละลาย", "แข็งตัว", "ควบแน่น"], answer: 0 },
+    { q: "เซลล์ของพืชมีส่วนพิเศษที่เซลล์สัตว์ไม่มีคืออะไร?", options: ["ผนังเซลล์", "นิวเคลียส", "ไมโทคอนเดรีย", "เยื่อหุ้มเซลล์"], answer: 0 },
+    { q: "เสียงเดินทางในรูปแบบของ?", options: ["คลื่นเสียง", "คลื่นน้ำ", "คลื่นแม่เหล็กไฟฟ้า", "คลื่นวิทยุ"], answer: 0 },
+    { q: "น้ำที่สะอาดจะมีค่า pH เท่าใด?", options: ["ต่ำกว่า 7", "เท่ากับ 7", "มากกว่า 7", "มากกว่า 14"], answer: 1 },
+    { q: "แหล่งพลังงานที่ไม่ทำลายสิ่งแวดล้อมคืออะไร?", options: ["ถ่านหิน", "พลังงานลม", "น้ำมัน", "แก๊สธรรมชาติ"], answer: 1 },
+    { q: "สิ่งมีชีวิตชนิดใดไม่ต้องการออกซิเจน?", options: ["แบคทีเรียบางชนิด", "คน", "ปลา", "นก"], answer: 0 },
+    { q: "อวัยวะในร่างกายที่กรองของเสียคือ?", options: ["ตับ", "ไต", "หัวใจ", "ปอด"], answer: 1 },
+    { q: "สิ่งใดต่อไปนี้เป็นแหล่งพลังงานแสงอาทิตย์?", options: ["ไฟฟ้า", "น้ำมัน", "ถ่านหิน", "แสงแดด"], answer: 3 },
+    { q: "สารที่ทำให้สีของดอกไม้เปลี่ยนแปลงเรียกว่า?", options: ["คลอโรฟิลล์", "แอนโทไซยานิน", "แร่ธาตุ", "น้ำ"], answer: 1 },
+    { q: "พืชใช้อะไรในการจับแสงเพื่อสังเคราะห์แสง?", options: ["คลอโรฟิลล์", "น้ำ", "ดิน", "ออกซิเจน"], answer: 0 },
+    { q: "พลังงานความร้อนในชีวิตประจำวันได้จากอะไร?", options: ["ไฟฟ้า", "การเผาไหม้", "น้ำ", "เสียง"], answer: 1 },
+    { q: "พลังงานที่ได้จากการเคลื่อนที่เรียกว่าอะไร?", options: ["พลังงานจลน์", "พลังงานศักย์", "พลังงานเคมี", "พลังงานแสง"], answer: 0 },
+    { q: "ธาตุอะไรเป็นส่วนประกอบหลักของน้ำ?", options: ["ไฮโดรเจนและออกซิเจน", "คาร์บอนและไนโตรเจน", "ออกซิเจนและไนโตรเจน", "คาร์บอนและไฮโดรเจน"], answer: 0 },
+    { q: "สิ่งใดเป็นแหล่งของพลังงานฟอสซิล?", options: ["น้ำมัน", "แสงแดด", "ลม", "น้ำ"], answer: 0 },
+    { q: "เมื่อใดน้ำจะกลายเป็นน้ำแข็ง?", options: ["ที่ 0°C", "ที่ 50°C", "ที่ 100°C", "ที่ 200°C"], answer: 0 },
+    { q: "สารใดที่มีสถานะเป็นแก๊สที่เราใช้ในการหายใจ?", options: ["ออกซิเจน", "คาร์บอนไดออกไซด์", "ไนโตรเจน", "ไฮโดรเจน"], answer: 0 },
+    { q: "พืชจะขาดสารอะไรถ้าไม่มีแสงแดด?", options: ["คลอโรฟิลล์", "อาหาร", "พลังงาน", "น้ำ"], answer: 2 },
+    { q: "สัตว์ชนิดใดอยู่ในกลุ่มสัตว์ครึ่งบกครึ่งน้ำ?", options: ["กบ", "งู", "นก", "ปลา"], answer: 0 },
+    { q: "แหล่งพลังงานที่สะอาดและไม่มีวันหมดเรียกว่าอะไร?", options: ["พลังงานหมุนเวียน", "พลังงานฟอสซิล", "พลังงานนิวเคลียร์", "พลังงานเคมี"], answer: 0 }
+  ];
+
+  let unusedQuestions = [...allQuestions];
+  let cardsQuestions = [];
+
+  const scoreboard = document.getElementById("scoreboard");
+  const grid = document.getElementById("card-grid");
+  const message = document.getElementById("message");
+
+  function initGame() {
+    scores = Array(numPlayers).fill(0);
+    currentTeam = 0;
+    unusedQuestions = [...allQuestions];
+    cardsQuestions = [];
+
+    scoreboard.innerHTML = "";
+    for(let i=0; i<numPlayers; i++) {
+      const div = document.createElement("div");
+      div.classList.add("team");
+      if(i === currentTeam) div.classList.add("active");
+      div.id = `team-${i+1}`;
+      div.textContent = `ทีม ${i+1}: 0 คะแนน`;
+      scoreboard.appendChild(div);
+    }
+
+    grid.innerHTML = "";
+
+    // สุ่มคำถามมาใส่ในไพ่ 6 ใบแรก
+    for(let i=0; i<NUM_CARDS; i++) {
+      const qIndex = Math.floor(Math.random() * unusedQuestions.length);
+      cardsQuestions.push(unusedQuestions.splice(qIndex,1)[0]);
+    }
+
+    for(let i=0; i<NUM_CARDS; i++) {
+      const card = createCard(i);
+      grid.appendChild(card);
+    }
+    message.textContent = `ถึงคิวทีม ${currentTeam+1} คลิกไพ่เพื่อเริ่มตอบคำถาม`;
+  }
+
+  function createCard(index) {
+    const card = document.createElement("div");
+    card.classList.add("card");
+    card.dataset.index = index;
+
+    const cardInner = document.createElement("div");
+    cardInner.classList.add("card-inner");
+
+    const cardFront = document.createElement("div");
+    cardFront.classList.add("card-front");
+
+    const cardBack = document.createElement("div");
+    cardBack.classList.add("card-back");
+
+    const questionText = document.createElement("div");
+    questionText.classList.add("question-text");
+    questionText.textContent = "";
+
+    const optionsDiv = document.createElement("div");
+    optionsDiv.classList.add("options");
+
+    cardBack.appendChild(questionText);
+    cardBack.appendChild(optionsDiv);
+
+    cardInner.appendChild(cardFront);
+    cardInner.appendChild(cardBack);
+
+    card.appendChild(cardInner);
+
+    card.addEventListener("click", () => {
+      if(card.classList.contains("open")) return; // เปิดไพ่ซ้ำไม่ได้
+      openCard(card);
+    });
+
+    return card;
+  }
+
+  function openCard(card) {
+    const idx = +card.dataset.index;
+    if(!cardsQuestions[idx]) return;
+
+    card.classList.add("open");
+    renderQuestion(idx, card);
+    message.textContent = `ทีม ${currentTeam+1} กำลังตอบคำถาม`;
+  }
+
+  function renderQuestion(idx, card) {
+    const question = cardsQuestions[idx];
+    const cardBack = card.querySelector(".card-back");
+    const questionText = cardBack.querySelector(".question-text");
+    const optionsDiv = cardBack.querySelector(".options");
+
+    questionText.textContent = question.q;
+    optionsDiv.innerHTML = "";
+
+    question.options.forEach((opt, i) => {
+      const btn = document.createElement("button");
+      btn.textContent = `${i+1}. ${opt}`;
+      btn.addEventListener("click", () => {
+        handleAnswer(idx, card, i);
+      });
+      optionsDiv.appendChild(btn);
+    });
+  }
+
+  function handleAnswer(idx, card, chosen) {
+    const question = cardsQuestions[idx];
+    const optionsDiv = card.querySelector(".options");
+    const buttons = optionsDiv.querySelectorAll("button");
+
+    // ปิดปุ่มทั้งหมดหลังตอบแล้ว
+    buttons.forEach(b => b.disabled = true);
+
+    if(chosen === question.answer) {
+      // ตอบถูก
+      scores[currentTeam] += 1;
+      updateScoreboard();
+      message.textContent = `ทีม ${currentTeam+1} ตอบถูก! ได้ 1 คะแนน`;
+      // เอาคำถามนี้ออกจากระบบ
+      removeQuestion(idx);
+      setTimeout(() => {
+        closeCardAndReplaceQuestion(card, idx);
+        nextTeamTurn();
+      }, 1500);
+    } else {
+      // ตอบผิด
+      message.textContent = `ตอบผิด! เปลี่ยนทีม`;
+      setTimeout(() => {
+        closeCard(card);
+        nextTeamTurn();
+      }, 1500);
+    }
+  }
+
+  function removeQuestion(idx) {
+    cardsQuestions[idx] = null; // เอาคำถามนี้ออก ไม่ถามซ้ำ
+  }
+
+  function closeCard(card) {
+    card.classList.remove("open");
+  }
+
+  function closeCardAndReplaceQuestion(card, idx) {
+    card.classList.remove("open");
+
+    // เอาคำถามใหม่มาแทน (ถ้ามี)
+    if(unusedQuestions.length > 0) {
+      const newIndex = Math.floor(Math.random() * unusedQuestions.length);
+      cardsQuestions[idx] = unusedQuestions.splice(newIndex,1)[0];
+    } else {
+      cardsQuestions[idx] = null; // ไม่มีคำถามใหม่แล้ว
+      card.querySelector(".card-front").textContent = "✓";
+      card.style.pointerEvents = "none"; // ไม่ให้กดไพ่ใบนี้อีก
+    }
+  }
+
+  function updateScoreboard() {
+    for(let i=0; i<numPlayers; i++) {
+      const div = document.getElementById(`team-${i+1}`);
+      div.textContent = `ทีม ${i+1}: ${scores[i]} คะแนน`;
+    }
+  }
+
+  function nextTeamTurn() {
+    currentTeam = (currentTeam + 1) % numPlayers;
+    // อัพเดตแถบ active
+    for(let i=0; i<numPlayers; i++) {
+      const div = document.getElementById(`team-${i+1}`);
+      if(i === currentTeam) div.classList.add("active");
+      else div.classList.remove("active");
+    }
+    message.textContent = `ถึงคิวทีม ${currentTeam+1} คลิกไพ่เพื่อเริ่มตอบคำถาม`;
+  }
+
+  initGame();
+</script>
+</body>
+</html>
